@@ -34,6 +34,10 @@ The system includes several built-in tools:
 - **FileReadTool** - Reads the contents of files
 - **FileEditTool** - Makes targeted edits to specific files or creates new files
 
+## Available Commands
+-- **exit** - Exit the agent. (alias: `break`)
+-- **trace** - Output a JSON trace of the agents actions.
+
 ## Usage
 
 Simply run the application and type your task at the prompt:
