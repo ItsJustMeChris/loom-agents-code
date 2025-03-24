@@ -69,8 +69,8 @@ The application is built with:
 
 ## Requirements
 
-- Node.js (v20 (Build with `23.10.0`) or higher recommended)
-- NPM or Yarn
+- Node.js (v23 or higher recommended)
+- npm
 
 ## License
 
