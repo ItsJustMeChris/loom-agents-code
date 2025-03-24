@@ -4,6 +4,7 @@ import fs from "fs";
 import { execSync } from "child_process";
 import { glob } from "glob";
 import { dirname } from "path";
+import ora from "ora";
 
 /***********************
  * Tool Definitions
@@ -208,7 +209,6 @@ const ProgrammingAgent = new Agent({
   sub_agents: [PlanValidationAgent, CodeWritingAgent, CodeReviewAgent],
 });
 
-// Enhanced main function with task start marker
 async function main() {
   while (true) {
     const response = await prompts({
@@ -218,19 +218,42 @@ async function main() {
     });
 
     if (!response.task) break;
+    if (response.task === "exit") break;
+    if (response.task === "quit") break;
+    if (response.task === "trace") {
+      console.log(ProgrammingAgent.trace.GetLog());
+      continue;
+    }
 
-    console.log("\nStarting task execution...\n");
+    // Start the spinner with an initial message
+    const spinner = ora("Starting task execution...").start();
 
-    const finalResult = await ProgrammingAgent.run(
-      `Perform the following task: ${response.task}. 
-      For multi-file projects, create all necessary files and ensure they work together.
-      Use the available tools to create directories and files as needed.
-      Provide a complete implementation that fulfills all requirements.`
-    );
+    // Update the spinner text periodically with the latest trace action
+    const traceInterval = setInterval(() => {
+      const trace = ProgrammingAgent.trace.GetLog();
+      if (trace && trace.length > 0) {
+        const latestTrace = trace[trace.length - 1].action;
+        spinner.text = `Processing... ${latestTrace}`;
+      }
+    }, 100);
 
-    console.log("\nFinal Output:\n", finalResult);
+    try {
+      const finalResult = await ProgrammingAgent.run(
+        `Perform the following task: ${response.task}. 
+        For multi-file projects, create all necessary files and ensure they work together.
+        Use the available tools to create directories and files as needed.
+        Provide a complete implementation that fulfills all requirements.`,
+        25
+      );
 
-    // console.log(ProgrammingAgent.trace.ToString());
+      clearInterval(traceInterval);
+      spinner.succeed("Task completed!");
+      console.log("\nFinal Output:\n", finalResult);
+    } catch (error) {
+      clearInterval(traceInterval);
+      spinner.fail("Task failed!");
+      console.error(error);
+    }
   }
 }
 
