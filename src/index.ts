@@ -3,7 +3,7 @@ import prompts from "prompts";
 import fs from "fs";
 import { execSync } from "child_process";
 import { glob } from "glob";
-import { dirname, join } from "path";
+import { dirname } from "path";
 
 async function main() {
   const BashTool = {
@@ -46,7 +46,6 @@ async function main() {
         if (!fs.existsSync(file)) {
           return `File ${file} does not exist`;
         }
-
         const fileContents = fs.readFileSync(file, "utf8");
         const matches = fileContents
           .split("\n")
@@ -66,19 +65,14 @@ async function main() {
     parameters: { path: { type: "string" } },
     callback: ({ path }: { path: string }) => {
       try {
-        // Default to current directory if path is empty
         const dirPath = path.trim() === "" ? "." : path;
-
         if (!fs.existsSync(dirPath)) {
           return `Directory ${dirPath} does not exist`;
         }
-
         const items = fs.readdirSync(dirPath, { withFileTypes: true });
-
         if (items.length === 0) {
           return `Directory ${dirPath} is empty`;
         }
-
         return items.map(
           (dirent) => `${dirent.name}${dirent.isDirectory() ? "/" : ""}`
         );
@@ -97,7 +91,6 @@ async function main() {
         if (!fs.existsSync(file)) {
           return `File ${file} does not exist`;
         }
-
         const content = fs.readFileSync(file, "utf8");
         return content.length > 0 ? content : `File ${file} is empty`;
       } catch (error: Error | any) {
@@ -116,13 +109,10 @@ async function main() {
     callback: ({ file, content }: { file: string; content: string }) => {
       try {
         const action = fs.existsSync(file) ? "updated" : "created";
-
-        // Ensure the directory exists
         const dir = dirname(file);
         if (!fs.existsSync(dir)) {
           fs.mkdirSync(dir, { recursive: true });
         }
-
         fs.writeFileSync(file, content);
         return `File ${file} successfully ${action}`;
       } catch (error: Error | any) {
@@ -131,40 +121,56 @@ async function main() {
     },
   };
 
+  /***********************
+   * Agent Definitions
+   ***********************/
+
   const CodeWritingAgent = new Agent({
     name: "CodeWritingAgent",
-    purpose: `You're a highly capable, expert code writer. You can write any language with ease.
-    You approach problems from a high level, and can solve complex problems with simple solutions.
-    `,
+    purpose: `You're a highly capable, expert code writer. Write clean, well-documented code based on a given plan.`,
+    model: "o3-mini-2025-01-31",
+  });
+
+  const CodeReviewAgent = new Agent({
+    name: "CodeReviewAgent",
+    purpose: `Review code for quality, style, and potential issues. Provide clear feedback and suggestions for improvements.`,
+    model: "o3-mini-2025-01-31",
+  });
+
+  const PlanValidationAgent = new Agent({
+    name: "PlanValidationAgent",
+    purpose: `Validate project plans for feasibility, completeness, and clarity. Improve the plan if necessary.`,
     model: "o3-mini-2025-01-31",
   });
 
   const ProgrammingAgent = new Agent({
     name: "ProgrammingAgent",
-    purpose: `You're an immensely powerful code agent, you build applications, scripts, tools, and more.
-    Draft a plan first, then take a look at your environment and then start working.
-    You can solve simple and complex tasks autonomously. 
-    You can interact on the users computer, and on the internet.
-    You orchestrate the operation, leveraging your tools and co-agents to get the job done.
-    Only ask CodeWritingAgent to write or edit code for specific tasks. Don't ask him to do general or broad tasks.
-    You orchestrate the project, he just writes code that you put into files. 
-    `,
+    purpose: `
+      You orchestrate the entire project lifecycle.
+      When a task is provided, interpret it, draft a plan, validate it using PlanValidationAgent,
+      generate code with CodeWritingAgent, review the code with CodeReviewAgent, and finally provide a consolidated result.
+      Only interrupt the user when absolutely necessary.
+      Use all tools available to you, so that you actually execute work and autonomously bring the task to completion.
+      `,
     tools: [BashTool, GlobTool, GrepTool, LSTool, FileReadTool, FileEditTool],
-    web_search: {
-      enabled: true,
-    },
-    sub_agents: [CodeWritingAgent],
+    web_search: { enabled: true },
+    sub_agents: [PlanValidationAgent, CodeWritingAgent, CodeReviewAgent],
   });
 
   while (true) {
     const response = await prompts({
       type: "text",
       name: "task",
-      message: "> What should we work on?",
+      message: "> What should we work on? (Press enter to exit)",
     });
 
-    const result = await ProgrammingAgent.run(response.task);
-    console.log(result);
+    if (!response.task) break;
+
+    const finalResult = await ProgrammingAgent.run(
+      `Perform the following task: ${response.task}. `
+    );
+
+    console.log("\nFinal Output:\n", finalResult);
   }
 }
 
