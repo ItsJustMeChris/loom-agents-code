@@ -1,5 +1,5 @@
 {
-  "name": "loop-agents-code",
+  "name": "loom-agents-code",
   "version": "1.0.1",
   "scripts": {
     "build": "tsc",
