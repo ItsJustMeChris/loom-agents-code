@@ -5,6 +5,8 @@ import { execSync } from "child_process";
 import { glob } from "glob";
 import { dirname } from "path";
 import ora from "ora";
+import { Runner } from "loom-agents";
+import { AgentResponse } from "loom-agents/dist/Agent";
 
 /***********************
  * Tool Definitions
@@ -210,6 +212,10 @@ const ProgrammingAgent = new Agent({
 });
 
 async function main() {
+  const runner = new Runner(ProgrammingAgent);
+
+  let result: AgentResponse | undefined = undefined;
+
   while (true) {
     const response = await prompts({
       type: "text",
@@ -220,40 +226,22 @@ async function main() {
     if (!response.task) break;
     if (response.task === "exit") break;
     if (response.task === "quit") break;
-    if (response.task === "trace") {
-      console.log(ProgrammingAgent.trace.GetLog());
-      continue;
-    }
 
     // Start the spinner with an initial message
     const spinner = ora("Starting task execution...").start();
 
-    // Update the spinner text periodically with the latest trace action
-    const traceInterval = setInterval(() => {
-      const trace = ProgrammingAgent.trace.GetLog();
-      if (trace && trace.length > 0) {
-        const latestTrace = trace[trace.length - 1].action;
-        spinner.text = `Processing... ${latestTrace}`;
-      }
-    }, 100);
+    result = await runner.run(
+      result
+        ? [...result.toInputList(), { role: "user", content: response.task }]
+        : `Perform the following task: ${response.task}. 
+     For multi-file projects, create all necessary files and ensure they work together.
+     Use the available tools to create directories and files as needed.
+     Provide a complete implementation that fulfills all requirements.`
+    );
 
-    try {
-      const finalResult = await ProgrammingAgent.run(
-        `Perform the following task: ${response.task}. 
-        For multi-file projects, create all necessary files and ensure they work together.
-        Use the available tools to create directories and files as needed.
-        Provide a complete implementation that fulfills all requirements.`,
-        25
-      );
+    spinner.succeed("Task completed!");
 
-      clearInterval(traceInterval);
-      spinner.succeed("Task completed!");
-      console.log("\nFinal Output:\n", finalResult);
-    } catch (error) {
-      clearInterval(traceInterval);
-      spinner.fail("Task failed!");
-      console.error(error);
-    }
+    console.log(result?.getContent());
   }
 }
 
