@@ -6,7 +6,6 @@ import { glob } from "glob";
 import { dirname } from "path";
 import ora from "ora";
 import { Runner } from "loom-agents";
-import { AgentResponse } from "loom-agents/dist/Agent";
 
 /***********************
  * Tool Definitions
@@ -214,7 +213,7 @@ const ProgrammingAgent = new Agent({
 async function main() {
   const runner = new Runner(ProgrammingAgent);
 
-  let result: AgentResponse | undefined = undefined;
+  let result: any = undefined;
 
   while (true) {
     const response = await prompts({
@@ -232,16 +231,21 @@ async function main() {
 
     result = await runner.run(
       result
-        ? [...result.toInputList(), { role: "user", content: response.task }]
+        ? {
+            context: [
+              ...result.context,
+              { role: "user", content: response.task },
+            ],
+          }
         : `Perform the following task: ${response.task}. 
-     For multi-file projects, create all necessary files and ensure they work together.
-     Use the available tools to create directories and files as needed.
-     Provide a complete implementation that fulfills all requirements.`
+    For multi-file projects, create all necessary files and ensure they work together.
+    Use the available tools to create directories and files as needed.
+    Provide a complete implementation that fulfills all requirements.`
     );
 
     spinner.succeed("Task completed!");
 
-    console.log(result?.getContent());
+    console.log(result.final_message);
   }
 }
 
